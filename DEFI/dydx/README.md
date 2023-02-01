@@ -2,6 +2,49 @@
 
 ## 代码架构
 
+```
+.
+├── ./PerpetualV1.sol
+├── ./impl
+│   ├── ./impl/P1Admin.sol
+│   ├── ./impl/P1FinalSettlement.sol
+│   ├── ./impl/P1Getters.sol
+│   ├── ./impl/P1Margin.sol
+│   ├── ./impl/P1Operator.sol
+│   ├── ./impl/P1Settlement.sol
+│   ├── ./impl/P1Storage.sol
+│   └── ./impl/P1Trade.sol
+├── ./intf
+│   ├── ./intf/I_P1Funder.sol
+│   ├── ./intf/I_P1Oracle.sol
+│   ├── ./intf/I_P1Trader.sol
+│   └── ./intf/I_PerpetualV1.sol
+├── ./lib
+│   ├── ./lib/P1BalanceMath.sol
+│   ├── ./lib/P1IndexMath.sol
+│   └── ./lib/P1Types.sol
+├── ./oracles
+│   ├── ./oracles/P1ChainlinkOracle.sol
+│   ├── ./oracles/P1FundingOracle.sol
+│   ├── ./oracles/P1InverseFundingOracle.sol
+│   ├── ./oracles/P1MakerOracle.sol
+│   ├── ./oracles/P1MirrorOracle.sol
+│   ├── ./oracles/P1MirrorOracleETHUSD.sol
+│   └── ./oracles/P1OracleInverter.sol
+├── ./proxies
+│   ├── ./proxies/P1CurrencyConverterProxy.sol
+│   ├── ./proxies/P1LiquidatorProxy.sol
+│   ├── ./proxies/P1Proxy.sol
+│   ├── ./proxies/P1SoloBridgeProxy.sol
+│   └── ./proxies/P1WethProxy.sol
+└── ./traders
+    ├── ./traders/P1Deleveraging.sol
+    ├── ./traders/P1InverseOrders.sol
+    ├── ./traders/P1Liquidation.sol
+    ├── ./traders/P1Orders.sol
+    └── ./traders/P1TraderConstants.sol
+```
+
 ### impl
 
 ```mermaid
@@ -1133,3 +1176,24 @@ P1TraderConstants --> P1Orders
 ```
 
 #### P1Orders
+
+#### P1Deleveraging
+
+#### P1InverseOrders
+
+#### P1Liquidation
+
+#### P1TraderConstants
+
+
+### proxy
+
+#### P1CurrencyConverterProxy
+
+#### P1LiquidatorProxy
+
+#### P1Proxy
+
+#### P1SoloBridgeProxy
+
+#### P1WethProxy
