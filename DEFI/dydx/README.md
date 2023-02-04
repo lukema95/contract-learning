@@ -1,11 +1,31 @@
-# Dydx 学习笔记
+# Dydx 合约源码分析
+
+## 概述
+dydx和一般中心化交易所的模式一样，采用订单簿模型。这意味着一个人要在某个价位想做空某个币，那么也必须有个人在该价位去做多该币种，这样才能撮合成功。这也就意味着不需要一个借款方来提供借款服务，因为最终买方和卖方的盈亏会互补。
+
+所有的合约交易者都需要提供保证金，交易者的损失将直接从保证金种扣除用来支付给盈利方，此外保证金还会用来扣除交易手续费和资金费率。最小保证金比例指的是对某个代币进行交易时，保证金
+
+价值和交易代币的实际价值的比。例如如果ETH-USDC的最小保证金比例为110%，那么如果要做空价值100美金的ETH需要抵押110USDC。
+
+假设交易对为ETH-USDC，一般的做空做多机制如下：
+
+- 如果是做多ETH，则向借款方借入USDC，并将USDC换成ETH，后续结算时再将ETH卖出成USDC，将USDC连本带息还给借款方。此时用户需要USDC作为抵押品。
+- 如果是做空ETH，则向借款方借入ETH，并将ETH换成USDC，后续结算时将USDC买回ETH，将ETH连本带息还给借款方。此时用户需要USDC作为抵押品。
+
+方便理解，提供一个简单的例子如下，假设最小保证金比例为110%(保证金价值/持仓头寸价值)，也就是说如果保证金比例低于110%则用户将被清算：
+
+1. A进行挂单在1000美金以5倍的杠杆做空以太坊，提供保证金为220，则做空的以太坊数量为: 220/110% * 5 / 1000 = 1 ETH。假设当前不存在在1000美金做多以太坊的挂单，所以A此时的订单没有及时成交，故A称为挂单者(maker)。
+2. B在1000美金以10倍做多以太坊，提供保证金为110，则做多的以太坊数量为： 110 / 110% * 10 / 1000 = 1 ETH。由于之前存在了A在1000美金做空的挂单，所以B可以立即成交，此时B成为吃单者(taker)。
+3. 此时A和B撮合成功，A持有1个以太坊多单头寸，B持有1个以太坊空单头寸。由于A的杠杆倍数为5倍，则以太坊价格当上涨1/5 = 20%时A的头寸将被清算。B的杠杆倍数为10倍，则以太坊价格下降1/10 = 10%时B的头寸将被清算。
+4. 当此时ETH价格上涨了2%，即1020美金。此时A将损失2% * 5 = 10% (也就是200 * 10% =  20美金)，B将盈利2 * 10 = 20% (也就是100 * 20 % = 20 美金)。可见两者的盈亏相互抵消了，所以不需要第三方借款方来提供借款。当然为了简化此时我们不考虑手续费和资金费率的问题。
 
 ## 代码架构
 
+Dydx的V1版本Solidity合约目录结构如下：
 ```
 .
-├── ./PerpetualV1.sol
-├── ./impl
+├── ./PerpetualV1.sol // 入口实现合约
+├── ./impl     // 核心逻辑
 │   ├── ./impl/P1Admin.sol
 │   ├── ./impl/P1FinalSettlement.sol
 │   ├── ./impl/P1Getters.sol
@@ -14,16 +34,16 @@
 │   ├── ./impl/P1Settlement.sol
 │   ├── ./impl/P1Storage.sol
 │   └── ./impl/P1Trade.sol
-├── ./intf
+├── ./intf    // 核心接口
 │   ├── ./intf/I_P1Funder.sol
 │   ├── ./intf/I_P1Oracle.sol
 │   ├── ./intf/I_P1Trader.sol
 │   └── ./intf/I_PerpetualV1.sol
-├── ./lib
+├── ./lib    // 公共库
 │   ├── ./lib/P1BalanceMath.sol
 │   ├── ./lib/P1IndexMath.sol
 │   └── ./lib/P1Types.sol
-├── ./oracles
+├── ./oracles    // 预言机合约
 │   ├── ./oracles/P1ChainlinkOracle.sol
 │   ├── ./oracles/P1FundingOracle.sol
 │   ├── ./oracles/P1InverseFundingOracle.sol
@@ -31,21 +51,64 @@
 │   ├── ./oracles/P1MirrorOracle.sol
 │   ├── ./oracles/P1MirrorOracleETHUSD.sol
 │   └── ./oracles/P1OracleInverter.sol
-├── ./proxies
+├── ./proxies    // 代理合约
 │   ├── ./proxies/P1CurrencyConverterProxy.sol
 │   ├── ./proxies/P1LiquidatorProxy.sol
 │   ├── ./proxies/P1Proxy.sol
 │   ├── ./proxies/P1SoloBridgeProxy.sol
 │   └── ./proxies/P1WethProxy.sol
-└── ./traders
+└── ./traders    // 交易者合约，供impl中的合约调用
     ├── ./traders/P1Deleveraging.sol
     ├── ./traders/P1InverseOrders.sol
     ├── ./traders/P1Liquidation.sol
     ├── ./traders/P1Orders.sol
     └── ./traders/P1TraderConstants.sol
+    
 ```
 
+其中PerpetualV1.sol为入口合约，继承其他功能模块合约：
+```mermaid
+graph TD
+P1FinalSettlement & P1Admin & P1Getters & P1Margin & P1Operator & P1Trade --> PerpetualV1
+
+```
+可以看到PerpetualV1继承的模块都来自impl目录中的合约，impl中的合约为交易的核心模块。
+
+PerpetualV1的初始化函数主要设置了USDC代币，代币价格预言机，资金费率合约的地址和最小抵押率。
+```
+function initializeV1(
+        address token,             // 保证金代币地址，即USDC地址
+        address oracle,            // 代币价格预言机地址，来自P1MakerOracle合约
+        address funder,            // 资金利率预言机的地址，来自P1FundingOracle合约
+        uint256 minCollateral      // 最小抵押率，例如110%则记为1100000000000000000 
+    )
+        external
+        onlyAdmin
+        nonReentrant
+    {
+        // only allow initialization once
+        require(
+            Storage.load(PERPETUAL_V1_INITIALIZE_SLOT) == 0x0,
+            "PerpetualV1 already initialized"
+        );
+        Storage.store(PERPETUAL_V1_INITIALIZE_SLOT, bytes32(uint256(1)));
+
+        _TOKEN_ = token;
+        _ORACLE_ = oracle;
+        _FUNDER_ = funder;
+        _MIN_COLLATERAL_ = minCollateral;
+
+        _GLOBAL_INDEX_ = P1Types.Index({
+            timestamp: uint32(block.timestamp),
+            isPositive: false,
+            value: 0
+        });
+    }
+```
+
+
 ### impl
+impl目录中的合约是核心的逻辑实现合约。
 
 ```mermaid
 graph TD
@@ -77,75 +140,53 @@ ReentrancyGuard --> P1Storage
 P1FinalSettlement --> P1Trade
 
 ```
+为方便理解，下面从顶向下分析各个合约的主要功能逻辑。
 
-#### P1Settlement
-包含账户间资金支付结算逻辑的合约。
+#### P1Margin
+P1Margin合约用于存款与取款，在第一次进行做空或做多之前，我们首先需要在平台中进行存款的操作，存款存入的是USDC，如果使用其他代币存入会先在Uniswap等平台将该代币兑换成USDC后再存入。
+
+##### deposit
+P1Margin合约的存款函数如下：
 ```
-/*
+function deposit(
+        address account,    // 存款的账户地址
+        uint256 amount      // 存款数量
+    )
+        external
+        noFinalSettlement
+        nonReentrant
+    {
+        // 调用P1FinalSettlement合约，获取上下文信息
+        P1Types.Context memory context = _loadContext();
+        // 调用P1FinalSettlement合约，结算并更新账户余额
+        // 每次存款时都进行一次结算操作，这时用户承担结算的费用
+        // 结算操作主要是根据账户当前的持仓头寸和资金费率，更新账户的保证金余额
+        P1Types.Balance memory balance = _settleAccount(context, account);
 
-    Copyright 2020 dYdX Trading Inc.
+        // 从_TOKEN_合约中将账户要存款的金额转入本合约
+        // _TOKEN_合约地址即为USDC的合约地址
+        SafeERC20.safeTransferFrom(
+            IERC20(_TOKEN_),
+            msg.sender,
+            address(this),
+            amount
+        );
 
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
+        // 更新账户的保证金余额
+        balance.addToMargin(amount);
+        _BALANCES_[account] = balance;
 
-    http://www.apache.org/licenses/LICENSE-2.0
+        emit LogDeposit(
+            account,
+            amount,
+            balance.toBytes32()
+        );
+    }
+```
 
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
-
-*/
-
-pragma solidity 0.5.16;
-pragma experimental ABIEncoderV2;
-
-import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
-import { P1Storage } from "./P1Storage.sol";
-import { BaseMath } from "../../lib/BaseMath.sol";
-import { SafeCast } from "../../lib/SafeCast.sol";
-import { SignedMath } from "../../lib/SignedMath.sol";
-import { I_P1Funder } from "../intf/I_P1Funder.sol";
-import { I_P1Oracle } from "../intf/I_P1Oracle.sol";
-import { P1BalanceMath } from "../lib/P1BalanceMath.sol";
-import { P1IndexMath } from "../lib/P1IndexMath.sol";
-import { P1Types } from "../lib/P1Types.sol";
-
-
-/**
- * @title P1Settlement
- * @author dYdX
- *
- * @notice Contract containing logic for settling funding payments between accounts.
- */
-contract P1Settlement is
-    P1Storage
-{
-    using BaseMath for uint256;
-    using SafeCast for uint256;
-    using SafeMath for uint256;
-    using P1BalanceMath for P1Types.Balance;
-    using P1IndexMath for P1Types.Index;
-    using SignedMath for SignedMath.Int;
-
-    // ============ Events ============
-
-    event LogIndex(
-        bytes32 index
-    );
-
-    event LogAccountSettled(
-        address indexed account,
-        bool isPositive,
-        uint256 amount,
-        bytes32 balance
-    );
-
-    // ============ Functions ============
-
-    /**
+`_loadContext`函数计算自上次更新以来的资金变更，并将其存储在Global Index中，实现如下：
+```
+ /**
      * @dev Calculates the funding change since the last update and stores it in the Global Index.
      *
      * @return Context struct that containing:
@@ -153,6 +194,7 @@ contract P1Settlement is
      *         - The global index;
      *         - The minimum required collateralization.
      */
+    // 计算自上次更新以来的资金变更，并将其存储在Global Index中
     function _loadContext()
         internal
         returns (P1Types.Context memory)
@@ -160,14 +202,14 @@ contract P1Settlement is
         // SLOAD old index
         // Idex代表每个账户的索引，用来结算，这里获取的是全局的某个币种的索引
         // struct Index {
-        //     uint32 timestamp;
-        //     bool isPositive;
+        //     uint32 timestamp; 
+        //     bool isPositive;  
         //     uint128 value;
         // }        
         P1Types.Index memory index = _GLOBAL_INDEX_;
 
         // get Price (P)
-        // 这里获取价格好像没有具体的币种，可能是每个币种部署一个合约？
+        // 这里使用预言机获取代币的价格，例如ETH-USDC交易对，则为获取ETH相对于USDC的价格
         uint256 price = I_P1Oracle(_ORACLE_).getPrice();
 
         // get Funding (F)
@@ -181,6 +223,7 @@ contract P1Settlement is
             });
 
             // Get the funding rate, applied over the time delta.
+            // 获取资金费率
             (
                 bool fundingPositive,
                 uint256 fundingValue
@@ -191,11 +234,17 @@ contract P1Settlement is
             fundingValue = fundingValue.baseMul(price);
 
             // Update the index according to the funding rate, applied over the time delta.
+            // 分几种情况：
+            // 1.如果资金费率之前为正的，现在也为正的，那么直接将绝对值相加，再取正号
+            // 2.如果资金费率之前为负的，现在为正的，那么需要将较大的绝对值减去较小的绝对值，再取绝对值大的那个的符号
+            // 3.如果资金费率之前为正的，现在为负的，那么需要将较大的绝对值减去较小的绝对值，再取绝对值大的那个的符号
+            // 4.如果资金费率之前为负的，现在也为负的，那么直接将绝对值相加，再取负号
             if (fundingPositive) {
-                // 如果当前资金费率是正的，那么说明账户可以收到资金
+                // 如果当前资金费率是正的，那么直接相加
+                // add函数实现了有符号a + 无符号b的算法
                 signedIndex = signedIndex.add(fundingValue);
             } else {
-                // 如果资金费率是负的，说明用户需要支付资金
+                // 如果资金费率是负的，那么减去该值
                 signedIndex = signedIndex.sub(fundingValue);
             }
 
@@ -217,32 +266,11 @@ contract P1Settlement is
         });
     }
 
-    /**
-     * @dev Settle the funding payments for a list of accounts and return their resulting balances.
-     */
-    // 根据_loadContext返回的某个币种的索引信息来给账户做结算
-    // 这里传入的账户地址列表应该是持有某个币种订单的账户
-    function _settleAccounts(
-        P1Types.Context memory context,
-        address[] memory accounts
-    )
-        internal
-        returns (P1Types.Balance[] memory)
-    {
-        uint256 numAccounts = accounts.length;
-        P1Types.Balance[] memory result = new P1Types.Balance[](numAccounts);
+```
 
-        for (uint256 i = 0; i < numAccounts; i++) {
-            result[i] = _settleAccount(context, accounts[i]);
-        }
-
-        return result;
-    }
-
-    /**
-     * @dev Settle the funding payment for a single account and return its resulting balance.
-     */
-    function _settleAccount(
+接下来是`_settleAccount`函数，该函数会根据上述`_loadContext`获取的资金费率和代币价格等信心来对账户进行结算，然后更新账户的保证金余额。
+```
+function _settleAccount(
         P1Types.Context memory context,
         address account
     )
@@ -262,7 +290,7 @@ contract P1Settlement is
         }
 
         // Store a cached copy of the index for this account.
-        // 将全局索引存储到用户的索引(作用？)
+        // 更新全局索引存储到用户的本地缓存索引
         _LOCAL_INDEXES_[account] = newIndex;
 
         // No need for settlement if balance is zero.
@@ -276,16 +304,16 @@ contract P1Settlement is
             isPositive: newIndex.isPositive,
             value: newIndex.value
         });
+        // 计算新旧两次资金费率的差值：新值-旧值
         if (oldIndex.isPositive) {
-            // 如果旧的索引是正的费率，则用当前新的索引值减去旧的索引值
-            // 假设当前最新索引的Value为200，费率为正(+200)，旧索引的值为100
-            // 则 200 - 100 = 100, 加上当前费率符号相当于+100
-            // 假设当前最新索引的Value为200，费率为负(-200)，旧索引的值为100
-            // 则 200 - 100 = 100, 加上当前费率符号相当于-100
-            // 由于之前的value值是累加的，所以只需要算出前后两次的差值用来计算
+            // 如果旧的索引是正的资金费率，则用当前新的索引值减去旧的索引值
+            // sub函数实现了一个有符号数a减去一个无符号数b的功能
+            // 例如 a = -1, b = 2, 则 a - b = -3
+            // 这里的算法是取 a, b的绝对值相加，结果符号取负号
             signedIndexDiff = signedIndexDiff.sub(oldIndex.value);
         } else {
             // 如果旧的索引是负的费率，则用当前新的索引值加上旧的索引值
+            // add函数实现了一个有符号数a加上一个无符号数b的功能
             signedIndexDiff = signedIndexDiff.add(oldIndex.value);
         }
 
@@ -324,519 +352,13 @@ contract P1Settlement is
         return balance;
     }
 
-    /**
-     * @dev Returns true if the balance is collateralized according to the price and minimum
-     * collateralization passed-in through the context.
-     */
-    function _isCollateralized(
-        P1Types.Context memory context,
-        P1Types.Balance memory balance
-    )
-        internal
-        pure
-        returns (bool)
-    {
-        // 获取账户保证金和头寸
-        (uint256 positive, uint256 negative) = balance.getPositiveAndNegativeValue(context.price);
-
-        // Overflow risk assessment:
-        // 2^256 / 10^36 is significantly greater than 2^120 and this calculation is therefore not
-        // expected to be a limiting factor on the size of accounts that this contract can handle.
-        // 
-        return positive.mul(BaseMath.base()) >= negative.mul(context.minCollateral);
-    }
-}
-
 ```
+值得注意的是，如果资金费率为正(说明代币的合约价格相对于现货价格上溢)，则多头付给空头资金(即做多者支付给做空者)，以此来鼓励大家去做空，从而使代币合约价格趋向于现货价格。
 
-#### P1FinalSettlement
-账户最终结算提取保证金代币的数量
+##### withdraw
+取款函数和存款函数相反，也是先结算账户的资金费率后再将要提取的金额转给账户。
 ```
-/*
-
-    Copyright 2020 dYdX Trading Inc.
-
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
-
-*/
-
-pragma solidity 0.5.16;
-pragma experimental ABIEncoderV2;
-
-import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import { P1Settlement } from "./P1Settlement.sol";
-import { BaseMath } from "../../lib/BaseMath.sol";
-import { Math } from "../../lib/Math.sol";
-import { P1BalanceMath } from "../lib/P1BalanceMath.sol";
-import { P1Types } from "../lib/P1Types.sol";
-
-
-/**
- * @title P1FinalSettlement
- * @author dYdX
- *
- * @notice Functions regulating the smart contract's behavior during final settlement.
- */
-contract P1FinalSettlement is
-    P1Settlement
-{
-    using SafeMath for uint256;
-
-    // ============ Events ============
-
-    event LogWithdrawFinalSettlement(
-        address indexed account,
-        uint256 amount,
-        bytes32 balance
-    );
-
-    // ============ Modifiers ============
-
-    /**
-    * @dev Modifier to ensure the function is not run after final settlement has been enabled.
-    */
-    modifier noFinalSettlement() {
-        require(
-            !_FINAL_SETTLEMENT_ENABLED_,
-            "Not permitted during final settlement"
-        );
-        _;
-    }
-
-    /**
-    * @dev Modifier to ensure the function is only run after final settlement has been enabled.
-    */
-    modifier onlyFinalSettlement() {
-        require(
-            _FINAL_SETTLEMENT_ENABLED_,
-            "Only permitted during final settlement"
-        );
-        _;
-    }
-
-    // ============ Functions ============
-
-    /**
-     * @notice Withdraw the number of margin tokens equal to the value of the account at the time
-     *  that final settlement occurred.
-     * @dev Emits the LogAccountSettled and LogWithdrawFinalSettlement events.
-     */
-    function withdrawFinalSettlement()
-        external
-        onlyFinalSettlement
-        nonReentrant
-    {
-        // Load the context using the final settlement price.
-        P1Types.Context memory context = P1Types.Context({
-            price: _FINAL_SETTLEMENT_PRICE_,
-            minCollateral: _MIN_COLLATERAL_,
-            index: _GLOBAL_INDEX_
-        });
-
-        // Apply funding changes.
-        // 结算账户最后的资金费率，获取结算后账户的余额
-        P1Types.Balance memory balance = _settleAccount(context, msg.sender);
-
-        // Determine the account net value.
-        // `positive` and `negative` are base values with extra precision.
-        (uint256 positive, uint256 negative) = P1BalanceMath.getPositiveAndNegativeValue(
-            balance,
-            context.price
-        );
-
-        // No amount is withdrawable.
-        // 保证金不足以扣除，则无法提取
-        if (positive < negative) {
-            return;
-        }
-
-        // Get the account value, which is rounded down to the nearest token amount.
-        uint256 accountValue = positive.sub(negative).div(BaseMath.base());
-
-        // Get the number of tokens in the Perpetual Contract.
-        uint256 contractBalance = IERC20(_TOKEN_).balanceOf(address(this));
-
-        // Determine the maximum withdrawable amount.
-        uint256 amountToWithdraw = Math.min(contractBalance, accountValue);
-
-        // Update the user's balance.
-        uint120 remainingMargin = accountValue.sub(amountToWithdraw).toUint120();
-        balance = P1Types.Balance({
-            marginIsPositive: remainingMargin != 0, // true 说明账户还有未被领取的保证金
-            positionIsPositive: false,  // false 说明账户没有头寸？
-            margin: remainingMargin,    // 剩余未被提取的保证金
-            position: 0 // 结算后头寸更新为0
-        });
-        _BALANCES_[msg.sender] = balance;
-
-        // Send the tokens.
-        SafeERC20.safeTransfer(
-            IERC20(_TOKEN_),
-            msg.sender,
-            amountToWithdraw
-        );
-
-        // Emit the log.
-        emit LogWithdrawFinalSettlement(
-            msg.sender,
-            amountToWithdraw,
-            balance.toBytes32()
-        );
-    }
-}
-
-```
-
-#### P1Getters
-只读合约，获取账户余额和合约的参数等信息
-```
-/*
-
-    Copyright 2020 dYdX Trading Inc.
-
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
-
-*/
-
-pragma solidity 0.5.16;
-pragma experimental ABIEncoderV2;
-
-import { P1Storage } from "./P1Storage.sol";
-import { I_P1Oracle } from "../intf/I_P1Oracle.sol";
-import { P1Types } from "../lib/P1Types.sol";
-
-
-/**
- * @title P1Getters
- * @author dYdX
- *
- * @notice Contract for read-only getters.
- */
-contract P1Getters is
-    P1Storage
-{
-    // ============ Account Getters ============
-
-    /**
-     * @notice Get the balance of an account, without accounting for changes in the index.
-     *
-     * @param  account  The address of the account to query the balances of.
-     * @return          The balances of the account.
-     */
-    function getAccountBalance(
-        address account
-    )
-        external
-        view
-        returns (P1Types.Balance memory)
-    {
-        return _BALANCES_[account];
-    }
-
-    /**
-     * @notice Gets the most recently cached index of an account.
-     *
-     * @param  account  The address of the account to query the index of.
-     * @return          The index of the account.
-     */
-    function getAccountIndex(
-        address account
-    )
-        external
-        view
-        returns (P1Types.Index memory)
-    {
-        return _LOCAL_INDEXES_[account];
-    }
-
-    /**
-     * @notice Gets the local operator status of an operator for a particular account.
-     *
-     * @param  account   The account to query the operator for.
-     * @param  operator  The address of the operator to query the status of.
-     * @return           True if the operator is a local operator of the account, false otherwise.
-     */
-    function getIsLocalOperator(
-        address account,
-        address operator
-    )
-        external
-        view
-        returns (bool)
-    {
-        return _LOCAL_OPERATORS_[account][operator];
-    }
-
-    // ============ Global Getters ============
-
-    /**
-     * @notice Gets the global operator status of an address.
-     *
-     * @param  operator  The address of the operator to query the status of.
-     * @return           True if the address is a global operator, false otherwise.
-     */
-    function getIsGlobalOperator(
-        address operator
-    )
-        external
-        view
-        returns (bool)
-    {
-        return _GLOBAL_OPERATORS_[operator];
-    }
-
-    /**
-     * @notice Gets the address of the ERC20 margin contract used for margin deposits.
-     *
-     * @return The address of the ERC20 token.
-     */
-    function getTokenContract()
-        external
-        view
-        returns (address)
-    {
-        return _TOKEN_;
-    }
-
-    /**
-     * @notice Gets the current address of the price oracle contract.
-     *
-     * @return The address of the price oracle contract.
-     */
-    function getOracleContract()
-        external
-        view
-        returns (address)
-    {
-        return _ORACLE_;
-    }
-
-    /**
-     * @notice Gets the current address of the funder contract.
-     *
-     * @return The address of the funder contract.
-     */
-    function getFunderContract()
-        external
-        view
-        returns (address)
-    {
-        return _FUNDER_;
-    }
-
-    /**
-     * @notice Gets the most recently cached global index.
-     *
-     * @return The most recently cached global index.
-     */
-    function getGlobalIndex()
-        external
-        view
-        returns (P1Types.Index memory)
-    {
-        return _GLOBAL_INDEX_;
-    }
-
-    /**
-     * @notice Gets minimum collateralization ratio of the protocol.
-     *
-     * @return The minimum-acceptable collateralization ratio, returned as a fixed-point number with
-     *  18 decimals of precision.
-     */
-    function getMinCollateral()
-        external
-        view
-        returns (uint256)
-    {
-        return _MIN_COLLATERAL_;
-    }
-
-    /**
-     * @notice Gets the status of whether final-settlement was initiated by the Admin.
-     *
-     * @return True if final-settlement was enabled, false otherwise.
-     */
-    function getFinalSettlementEnabled()
-        external
-        view
-        returns (bool)
-    {
-        return _FINAL_SETTLEMENT_ENABLED_;
-    }
-
-    // ============ Authorized External Getters ============
-
-    /**
-     * @notice Gets the price returned by the oracle.
-     * @dev Only able to be called by global operators.
-     *
-     * @return The price returned by the current price oracle.
-     */
-    function getOraclePrice()
-        external
-        view
-        returns (uint256)
-    {
-        require(
-            _GLOBAL_OPERATORS_[msg.sender],
-            "Oracle price requester not global operator"
-        );
-        return I_P1Oracle(_ORACLE_).getPrice();
-    }
-
-    // ============ Public Getters ============
-
-    /**
-     * @notice Gets whether an address has permissions to operate an account.
-     *
-     * @param  account   The account to query.
-     * @param  operator  The address to query.
-     * @return           True if the operator has permission to operate the account,
-     *                   and false otherwise.
-     */
-    function hasAccountPermissions(
-        address account,
-        address operator
-    )
-        public
-        view
-        returns (bool)
-    {
-        return account == operator
-            || _GLOBAL_OPERATORS_[operator]
-            || _LOCAL_OPERATORS_[account][operator];
-    }
-}
-
-```
-
-#### P1Margin
-用于存款与取款的合约
-```
-/*
-
-    Copyright 2020 dYdX Trading Inc.
-
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
-
-*/
-
-pragma solidity 0.5.16;
-pragma experimental ABIEncoderV2;
-
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import { P1FinalSettlement } from "./P1FinalSettlement.sol";
-import { P1Getters } from "./P1Getters.sol";
-import { P1BalanceMath } from "../lib/P1BalanceMath.sol";
-import { P1Types } from "../lib/P1Types.sol";
-
-
-/**
- * @title P1Margin
- * @author dYdX
- *
- * @notice Contract for withdrawing and depositing.
- */
-contract P1Margin is
-    P1FinalSettlement,
-    P1Getters
-{
-    using P1BalanceMath for P1Types.Balance;
-
-    // ============ Events ============
-
-    event LogDeposit(
-        address indexed account,
-        uint256 amount,
-        bytes32 balance
-    );
-
-    event LogWithdraw(
-        address indexed account,
-        address destination,
-        uint256 amount,
-        bytes32 balance
-    );
-
-    // ============ Functions ============
-
-    /**
-     * @notice Deposit some amount of margin tokens from the msg.sender into an account.
-     * @dev Emits LogIndex, LogAccountSettled, and LogDeposit events.
-     *
-     * @param  account  The account for which to credit the deposit.
-     * @param  amount   the amount of tokens to deposit.
-     */
-    function deposit(
-        address account,
-        uint256 amount
-    )
-        external
-        noFinalSettlement
-        nonReentrant
-    {
-        P1Types.Context memory context = _loadContext();
-        P1Types.Balance memory balance = _settleAccount(context, account);
-
-        SafeERC20.safeTransferFrom(
-            IERC20(_TOKEN_),
-            msg.sender,
-            address(this),
-            amount
-        );
-
-        balance.addToMargin(amount);
-        _BALANCES_[account] = balance;
-
-        emit LogDeposit(
-            account,
-            amount,
-            balance.toBytes32()
-        );
-    }
-
-    /**
-     * @notice Withdraw some amount of margin tokens from an account to a destination address.
-     * @dev Emits LogIndex, LogAccountSettled, and LogWithdraw events.
-     *
-     * @param  account      The account for which to debit the withdrawal.
-     * @param  destination  The address to which the tokens are transferred.
-     * @param  amount       The amount of tokens to withdraw.
-     */
-    function withdraw(
+function withdraw(
         address account,
         address destination,
         uint256 amount
@@ -845,6 +367,7 @@ contract P1Margin is
         noFinalSettlement
         nonReentrant
     {
+        // 判断交易的发送者拥有取款的权限
         require(
             hasAccountPermissions(account, msg.sender),
             "sender does not have permission to withdraw"
@@ -853,6 +376,7 @@ contract P1Margin is
         P1Types.Context memory context = _loadContext();
         P1Types.Balance memory balance = _settleAccount(context, account);
 
+        // 将取款的保证金转给取款账户指定的地址
         SafeERC20.safeTransfer(
             IERC20(_TOKEN_),
             destination,
@@ -875,90 +399,12 @@ contract P1Margin is
             balance.toBytes32()
         );
     }
-}
-
 ```
 
 #### P1Trade
-两个账户之间结算交易的合约
+P1Trade合约用于两个账户之间进行结算交易，核心逻辑在`trade`方法中，`trade`方法用来账户的订单交易：
 ```
-/*
-
-    Copyright 2020 dYdX Trading Inc.
-
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
-
-*/
-
-pragma solidity 0.5.16;
-pragma experimental ABIEncoderV2;
-
-import { SafeMath } from "@openzeppelin/contracts/math/SafeMath.sol";
-import { P1FinalSettlement } from "./P1FinalSettlement.sol";
-import { BaseMath } from "../../lib/BaseMath.sol";
-import { Require } from "../../lib/Require.sol";
-import { I_P1Trader } from "../intf/I_P1Trader.sol";
-import { P1BalanceMath } from "../lib/P1BalanceMath.sol";
-import { P1Types } from "../lib/P1Types.sol";
-
-
-/**
- * @title P1Trade
- * @author dYdX
- *
- * @notice Contract for settling trades between two accounts. A "trade" in this context may refer
- *  to any approved transfer of balances, as determined by the smart contracts implementing the
- *  I_P1Trader interface and approved as global operators on the PerpetualV1 contract.
- */
-contract P1Trade is
-    P1FinalSettlement
-{
-    using SafeMath for uint120;
-    using P1BalanceMath for P1Types.Balance;
-
-    // ============ Structs ============
-
-    struct TradeArg {
-        uint256 takerIndex;
-        uint256 makerIndex;
-        address trader;
-        bytes data;
-    }
-
-    // ============ Events ============
-
-    event LogTrade(
-        address indexed maker,
-        address indexed taker,
-        address trader,
-        uint256 marginAmount,
-        uint256 positionAmount,
-        bool isBuy, // from taker's perspective
-        bytes32 makerBalance,
-        bytes32 takerBalance
-    );
-
-    // ============ Functions ============
-
-    /**
-     * @notice Submits one or more trades between any number of accounts.
-     * @dev Emits the LogIndex event, one LogAccountSettled event for each account in `accounts`,
-     *  and the LogTrade event for each trade in `trades`.
-     *
-     * @param  accounts  The sorted list of accounts that are involved in trades.
-     * @param  trades    The list of trades to execute in-order.
-     */
-    function trade(
+function trade(
         address[] memory accounts,
         TradeArg[] memory trades
     )
@@ -990,6 +436,7 @@ contract P1Trade is
             address maker = accounts[tradeArg.makerIndex];
             address taker = accounts[tradeArg.takerIndex];
 
+            // 实际调用traders/P1Orders中的trade函数
             P1Types.TradeResult memory tradeResult = I_P1Trader(tradeArg.trader).trade(
                 msg.sender,
                 maker,
@@ -1002,6 +449,7 @@ contract P1Trade is
             traderFlags |= tradeResult.traderFlags;
 
             // If the accounts are equal, no need to update balances.
+            // 如果挂单者和吃单者是同一个人，则不需要更新余额
             if (maker == taker) {
                 continue;
             }
@@ -1009,12 +457,18 @@ contract P1Trade is
             // Modify currentBalances in-place. Note that `isBuy` is from the taker's perspective.
             P1Types.Balance memory makerBalance = currentBalances[tradeArg.makerIndex];
             P1Types.Balance memory takerBalance = currentBalances[tradeArg.takerIndex];
-            if (tradeResult.isBuy) {
+            // 做空者相当于将交易代币换成USDC，所以保证金余额会增加，交易代币头寸余额会减少
+            // 做多者相当于将USDC代币换成交易代币，所以保证金余额会减少，交易代币头寸余额会增多
+            if (tradeResult.isBuy) {    // taker 角度如果是购买订单(做多)，maker角度为做空卖出
+                // maker的保证金数量需要加上新订单成交所需的保证金
                 makerBalance.addToMargin(tradeResult.marginAmount);
+                // maker的持有头寸需要减去新订单成交的头寸数量
                 makerBalance.subFromPosition(tradeResult.positionAmount);
+                // taker所持有的保证金需要减去订单成交所需的保证金
                 takerBalance.subFromMargin(tradeResult.marginAmount);
+                // taker的持有头寸需要加上新订单成交的头寸数量
                 takerBalance.addToPosition(tradeResult.positionAmount);
-            } else {
+            } else {    // taker 角度如果是出售订单(做空), maker角度为做多买入
                 makerBalance.subFromMargin(tradeResult.marginAmount);
                 makerBalance.addToPosition(tradeResult.positionAmount);
                 takerBalance.addToMargin(tradeResult.marginAmount);
@@ -1037,6 +491,7 @@ contract P1Trade is
             );
         }
 
+        // 验证最后账户余额是否正确
         _verifyAccountsFinalBalances(
             context,
             accounts,
@@ -1045,123 +500,185 @@ contract P1Trade is
         );
     }
 
-    /**
-     * @dev Verify that `accounts` contains at least one address and that the contents are unique.
-     *  We verify uniqueness by requiring that the array is sorted.
-     */
-    function _verifyAccounts(
-        address[] memory accounts
+```
+方法内部调用了一个`I_P1Trader`接口合约中的一个同名`trade`函数，该函数的实现在traders/P1Orders.sol合约中，方法返回一个交易结果的数据结构`TradeResult`：
+```
+// traders/P1Orders.sol
+function trade(
+        address sender,         // 交易发送者
+        address maker,          // 订单的创建者，即挂单者
+        address taker,          // 订单的接收者，即吃单者
+        uint256 price,          // 交易的币种的价格
+        bytes calldata data,    // 交易订单参数
+        bytes32 /* traderFlags */
     )
-        private
-        pure
+        external
+        returns (P1Types.TradeResult memory)
     {
+        address perpetual = _PERPETUAL_V1_;
+
+        // 只能perpetual合约进行调用
         require(
-            accounts.length > 0,
-            "Accounts must have non-zero length"
+            msg.sender == perpetual,
+            "msg.sender must be PerpetualV1"
         );
 
-        // Check that accounts are unique
-        address prevAccount = accounts[0];
-        for (uint256 i = 1; i < accounts.length; i++) {
-            address account = accounts[i];
+        if (taker != sender) {
+            // sender 如果不是 taker，则sender必须获得taker的授权
             require(
-                account > prevAccount,
-                "Accounts must be sorted and unique"
-            );
-            prevAccount = account;
-        }
-    }
-
-    /**
-     * Verify that account balances at the end of the tx are allowable given the initial balances.
-     *
-     * We require that for every account, either:
-     * 1. The account meets the collateralization requirement; OR
-     * 2. All of the following are true:
-     *   a) The absolute value of the account position has not increased;
-     *   b) The sign of the account position has not flipped positive to negative or vice-versa.
-     *   c) The account's collateralization ratio has not worsened;
-     */
-    function _verifyAccountsFinalBalances(
-        P1Types.Context memory context,
-        address[] memory accounts,
-        P1Types.Balance[] memory initialBalances,
-        P1Types.Balance[] memory currentBalances
-    )
-        private
-        pure
-    {
-        for (uint256 i = 0; i < accounts.length; i++) {
-            P1Types.Balance memory currentBalance = currentBalances[i];
-            (uint256 currentPos, uint256 currentNeg) =
-                currentBalance.getPositiveAndNegativeValue(context.price);
-
-            // See P1Settlement._isCollateralized().
-            bool isCollateralized =
-                currentPos.mul(BaseMath.base()) >= currentNeg.mul(context.minCollateral);
-
-            if (isCollateralized) {
-                continue;
-            }
-
-            address account = accounts[i];
-            P1Types.Balance memory initialBalance = initialBalances[i];
-            (uint256 initialPos, uint256 initialNeg) =
-                initialBalance.getPositiveAndNegativeValue(context.price);
-
-            Require.that(
-                currentPos != 0,
-                "account is undercollateralized and has no positive value",
-                account
-            );
-            Require.that(
-                currentBalance.position <= initialBalance.position,
-                "account is undercollateralized and absolute position size increased",
-                account
-            );
-
-            // Note that currentBalance.position can't be zero at this point since that would imply
-            // either currentPos is zero or the account is well-collateralized.
-
-            Require.that(
-                currentBalance.positionIsPositive == initialBalance.positionIsPositive,
-                "account is undercollateralized and position changed signs",
-                account
-            );
-            Require.that(
-                initialNeg != 0,
-                "account is undercollateralized and was not previously",
-                account
-            );
-
-            // Note that at this point:
-            //   Absolute position size must have decreased and not changed signs.
-            //   Initial margin/position must be one of -/-, -/+, or +/-.
-            //   Current margin/position must now be either -/+ or +/-.
-            //
-            // Which implies one of the following [intial] -> [current] configurations:
-            //   [-/-] -> [+/-]
-            //   [-/+] -> [-/+]
-            //   [+/-] -> [+/-]
-
-            // Check that collateralization increased.
-            // In the case of [-/-] initial, initialPos == 0 so the following will pass. Otherwise:
-            // at this point, either initialNeg and currentNeg represent the margin values, or
-            // initialPos and currentPos do. Since the margin is multiplied by the base value in
-            // getPositiveAndNegativeValue(), it is safe to use baseDivMul() to divide the margin
-            // without any rounding. This is important to avoid the possibility of overflow.
-            Require.that(
-                currentBalance.positionIsPositive
-                    ? currentNeg.baseDivMul(initialPos) <= initialNeg.baseDivMul(currentPos)
-                    : initialPos.baseDivMul(currentNeg) <= currentPos.baseDivMul(initialNeg),
-                "account is undercollateralized and collateralization decreased",
-                account
+                P1Getters(perpetual).hasAccountPermissions(taker, sender),
+                "Sender does not have permissions for the taker"
             );
         }
+
+        TradeData memory tradeData = abi.decode(data, (TradeData));
+        bytes32 orderHash = _getOrderHash(tradeData.order);
+
+        // validations
+        // 检查订单的状态和订单的签名为maker进行签名
+        _verifyOrderStateAndSignature(
+            tradeData,
+            orderHash
+        );
+        
+        // 检查订单的价格，资金费率和数量等是否有效
+        _verifyOrderRequest(
+            tradeData,
+            maker,
+            taker,
+            perpetual,
+            price
+        );
+
+        // set _FILLED_AMOUNT_
+        uint256 oldFilledAmount = _FILLED_AMOUNT_[orderHash];
+        uint256 newFilledAmount = oldFilledAmount.add(tradeData.fill.amount);
+        // Fill订单表示当前成交的订单，由于Order中设置的数量可以部分成交
+        // 当前成交的数量必须 <= 订单设定的数量
+        require(
+            newFilledAmount <= tradeData.order.amount,
+            "Cannot overfill order"
+        );
+        _FILLED_AMOUNT_[orderHash] = newFilledAmount;
+
+        emit LogOrderFilled(
+            orderHash,
+            tradeData.order.flags,
+            tradeData.order.triggerPrice,
+            tradeData.fill
+        );
+
+        // Order fee is denoted as a percentage of execution price.
+        // Convert into an amount per unit position.
+        // 单位手续费 = fee * price
+        uint256 fee = tradeData.fill.fee.baseMul(tradeData.fill.price);
+
+        // `isBuyOrder` is from the maker's perspective.
+        bool isBuyOrder = _isBuy(tradeData.order);
+        // 如果是购买订单(做多)且资金费率为负(空头支付给多头)，则每单位头寸所需的保证金需要减去手续费
+        // 如果是购买订单(做多)且资金费率为正(多头支付给空头)，则每单位头寸所需的保证金需要加上手续费
+        uint256 marginPerPosition = (isBuyOrder == tradeData.fill.isNegativeFee)
+            ? tradeData.fill.price.sub(fee)
+            : tradeData.fill.price.add(fee);
+
+        return P1Types.TradeResult({
+            // 保证金数量 = 每单位头寸所需保证金 * 订单成交头寸数量
+            marginAmount: tradeData.fill.amount.baseMul(marginPerPosition),
+            positionAmount: tradeData.fill.amount,
+            isBuy: !isBuyOrder, // 从taker角度看的话，isBuy正好和maker相反
+            traderFlags: TRADER_FLAG_ORDERS
+        });
     }
-}
 
 ```
+其中`_verifyOrderRequest`方法用来检查订单的价格，资金费率和数量等是否有效：
+
+```
+function _verifyOrderRequest(
+        TradeData memory tradeData,
+        address maker,
+        address taker,
+        address perpetual,
+        uint256 price
+    )
+        private
+        view
+    {
+        require(
+            tradeData.order.maker == maker,
+            "Order maker does not match maker"
+        );
+        require(
+            tradeData.order.taker == taker || tradeData.order.taker == address(0),
+            "Order taker does not match taker"
+        );
+        require(
+            tradeData.order.expiration >= block.timestamp || tradeData.order.expiration == 0,
+            "Order has expired"
+        );
+
+        // `isBuyOrder` is from the maker's perspective.
+        // 对于maker来说该订单是否是购买订单(做多)
+        // fill相当于吃单的数量，order为挂单时的数量
+        bool isBuyOrder = _isBuy(tradeData.order);
+        // 如果是购买订单，则部分购买成交订单的购买价格要小于等于设置好的限价单
+        // 如果是出售订单，则部分出售订单的出售成交价格要大于等于设置好的限价单
+        bool validPrice = isBuyOrder
+            ? tradeData.fill.price <= tradeData.order.limitPrice
+            : tradeData.fill.price >= tradeData.order.limitPrice;
+        require(
+            validPrice,
+            "Fill price is invalid"
+        );
+
+        // 检查是否是有效的资金费率
+        // 如果是负的交易手续费，则fill（吃单）的订单手续费为负且fill的手续费必须 >= order的限价交易手续费
+        // 如果是正的交易手续费，则fill（吃单）的订单手续费为负 || fill的交易手续费 <= order的限价交易手续费
+        bool validFee = _isNegativeLimitFee(tradeData.order)
+            ? tradeData.fill.isNegativeFee && tradeData.fill.fee >= tradeData.order.limitFee
+            : tradeData.fill.isNegativeFee || tradeData.fill.fee <= tradeData.order.limitFee;
+        require(
+            validFee,
+            "Fill fee is invalid"
+        );
+
+        // 如果账户订单设置了触发价格
+        if (tradeData.order.triggerPrice != 0) {
+            // 如果是购买订单，且当前价格>=触发价格，则触发有效
+            // 如果是出售订单，且当前价格<=触发价格，则触发有效
+            bool validTriggerPrice = isBuyOrder
+                ? tradeData.order.triggerPrice <= price
+                : tradeData.order.triggerPrice >= price;
+            require(
+                validTriggerPrice,
+                "Trigger price has not been reached"
+            );
+        }
+        // 如果订单是仅减仓模式
+        if (_isDecreaseOnly(tradeData.order)) {
+            P1Types.Balance memory balance = P1Getters(perpetual).getAccountBalance(maker);
+            // 
+            require(
+                isBuyOrder != balance.positionIsPositive     // True:如果账户的操作是减仓
+                && tradeData.fill.amount <= balance.position, // True:如果执行的交易小于等于用户所持有的仓位
+                "Fill does not decrease position"
+            );
+        }
+    }
+
+```
+
+
+#### P1Settlement
+包含账户间资金支付结算逻辑的合约。
+
+
+#### P1FinalSettlement
+账户最终结算提取保证金代币的数量。
+
+#### P1Getters
+只读合约，获取账户余额和合约的参数等信息。
+
 
 ### trader
 ```mermaid
@@ -1176,24 +693,34 @@ P1TraderConstants --> P1Orders
 ```
 
 #### P1Orders
+(todo)
 
 #### P1Deleveraging
+(todo)
 
 #### P1InverseOrders
+(todo)
 
 #### P1Liquidation
+(todo)
 
 #### P1TraderConstants
+(todo)
 
 
 ### proxy
 
 #### P1CurrencyConverterProxy
+(todo)
 
 #### P1LiquidatorProxy
+(todo)
 
 #### P1Proxy
+(todo)
 
 #### P1SoloBridgeProxy
+(todo)
 
 #### P1WethProxy
+(todo)
