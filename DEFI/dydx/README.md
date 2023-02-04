@@ -669,12 +669,76 @@ function _verifyOrderRequest(
 ```
 
 
+#### P1FinalSettlement
+P1FinalSettlement合约用来进行账户最终结算提取保证金代币的数量。主要逻辑在`withdrawFinalSettlement`方法中：
+```
+function withdrawFinalSettlement()
+        external
+        onlyFinalSettlement
+        nonReentrant
+    {
+        // Load the context using the final settlement price.
+        P1Types.Context memory context = P1Types.Context({
+            price: _FINAL_SETTLEMENT_PRICE_,
+            minCollateral: _MIN_COLLATERAL_,
+            index: _GLOBAL_INDEX_
+        });
+
+        // Apply funding changes.
+        // 结算账户最后的资金费率，获取结算后账户的余额
+        P1Types.Balance memory balance = _settleAccount(context, msg.sender);
+
+        // Determine the account net value.
+        // `positive` and `negative` are base values with extra precision.
+        (uint256 positive, uint256 negative) = P1BalanceMath.getPositiveAndNegativeValue(
+            balance,
+            context.price
+        );
+
+        // No amount is withdrawable.
+        // 保证金不足以扣除，则无法提取
+        if (positive < negative) {
+            return;
+        }
+
+        // Get the account value, which is rounded down to the nearest token amount.
+        // 获取账户可提取的金额： positive - negative
+        uint256 accountValue = positive.sub(negative).div(BaseMath.base());
+
+        // Get the number of tokens in the Perpetual Contract.
+        uint256 contractBalance = IERC20(_TOKEN_).balanceOf(address(this));
+
+        // Determine the maximum withdrawable amount.
+        uint256 amountToWithdraw = Math.min(contractBalance, accountValue);
+
+        // Update the user's balance.
+        uint120 remainingMargin = accountValue.sub(amountToWithdraw).toUint120();
+        balance = P1Types.Balance({
+            marginIsPositive: remainingMargin != 0, // true 说明账户还有未被领取的保证金
+            positionIsPositive: false,              // false 说明账户没有头寸？
+            margin: remainingMargin,                // 剩余未被提取的保证金
+            position: 0                             // 结算后头寸更新为0
+        });
+        _BALANCES_[msg.sender] = balance;
+
+        // Send the tokens.
+        SafeERC20.safeTransfer(
+            IERC20(_TOKEN_),
+            msg.sender,
+            amountToWithdraw
+        );
+
+        // Emit the log.
+        emit LogWithdrawFinalSettlement(
+            msg.sender,
+            amountToWithdraw,
+            balance.toBytes32()
+        );
+    }
+```
+
 #### P1Settlement
 包含账户间资金支付结算逻辑的合约。
-
-
-#### P1FinalSettlement
-账户最终结算提取保证金代币的数量。
 
 #### P1Getters
 只读合约，获取账户余额和合约的参数等信息。
