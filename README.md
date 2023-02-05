@@ -1,1 +1,2 @@
-# smart-contract-learning
+# contract-learning
+Learn solidity Smart Contract notes 📒

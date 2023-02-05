@@ -19,7 +19,7 @@ dydx和一般中心化交易所的模式一样，采用订单簿模型。这意�
 
 ## 代码架构
 
-Dydx的V1版本Solidity合约目录结构如下：
+Dydx的V1版本[Solidity合约](https://github.com/dydxprotocol/perpetual)目录结构如下：
 ```
 .
 ├── ./PerpetualV1.sol // 入口实现合约
