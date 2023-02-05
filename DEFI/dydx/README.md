@@ -873,6 +873,116 @@ function _doLiquidation(
 
 ```
 
+`_doLiquidation`中最后调用了P1Trade.sol合约的`trade`方法，`trade`方法里面又调用了traders/P1Liquidation.sol中的trade方法:
+```
+// traders/P1Liquidation.sol
+function trade(
+        address sender,
+        address maker,
+        address taker,
+        uint256 price,
+        bytes calldata data,
+        bytes32 /* traderFlags */
+    )
+        external
+        returns (P1Types.TradeResult memory)
+    {
+        address perpetual = _PERPETUAL_V1_;
+
+        require(
+            msg.sender == perpetual,
+            "msg.sender must be PerpetualV1"
+        );
+
+        require(
+            P1Getters(perpetual).getIsGlobalOperator(sender),
+            "Sender is not a global operator"
+        );
+
+        TradeData memory tradeData = abi.decode(data, (TradeData));
+        P1Types.Balance memory makerBalance = P1Getters(perpetual).getAccountBalance(maker);
+
+        // 验证清算订单的参数正确
+        _verifyTrade(
+            tradeData,
+            makerBalance,
+            perpetual,
+            price
+        );
+
+        // Bound the execution amount by the size of the maker position.
+        uint256 amount = Math.min(tradeData.amount, makerBalance.position);
+
+        // When partially liquidating the maker, maintain the same position/margin ratio.
+        // Ensure the collateralization of the maker does not decrease.
+        uint256 marginAmount;
+        if (tradeData.isBuy) {
+            // 等比例扣除被清算人的保证金
+            // 保证金数量 = 保证金余额 * (清算头寸数量 / 持有头寸数量)
+            marginAmount = uint256(makerBalance.margin).getFractionRoundUp(
+                amount,
+                makerBalance.position
+            );
+        } else {
+            marginAmount = uint256(makerBalance.margin).getFraction(amount, makerBalance.position);
+        }
+
+        emit LogLiquidated(
+            maker,
+            taker,
+            amount,
+            tradeData.isBuy,
+            price
+        );
+
+        return P1Types.TradeResult({
+            marginAmount: marginAmount,
+            positionAmount: amount,
+            isBuy: tradeData.isBuy,
+            traderFlags: TRADER_FLAG_LIQUIDATION
+        });
+    }
+
+function _verifyTrade(
+        TradeData memory tradeData,
+        P1Types.Balance memory makerBalance,
+        address perpetual,
+        uint256 price
+    )
+        private
+        view
+    {
+        // 检查被清算人是否已经到达被清算条件
+        require(
+            _isUndercollateralized(makerBalance, perpetual, price),
+            "Cannot liquidate since maker is not undercollateralized"
+        );
+        // 清算数量不能大于账户可清算的头寸
+        require(
+            !tradeData.allOrNothing || makerBalance.position >= tradeData.amount,
+            "allOrNothing is set and maker position is less than amount"
+        );
+        // 清算只能减少被清算人的头寸，不能增加
+        require(
+            tradeData.isBuy == makerBalance.positionIsPositive,
+            "liquidation must not increase maker's position size"
+        );
+
+        // Disallow liquidating in the edge case where both the position and margin are negative.
+        //
+        // This case is not handled correctly by P1Trade. If an account is in this situation, the
+        // margin should first be set to zero via a deposit, then the account should be deleveraged.
+        // 被清算账户的保证金和头寸不能都为负
+        require(
+            makerBalance.marginIsPositive || makerBalance.margin == 0 ||
+                makerBalance.positionIsPositive || makerBalance.position == 0,
+            "Cannot liquidate when maker position and margin are both negative"
+        );
+    }
+
+
+```
+
 #### P1CurrencyConverterProxy
 (todo)
 
