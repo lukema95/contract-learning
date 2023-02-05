@@ -1,23 +1,21 @@
 # Dydx 合约源码分析
 
 ## 概述
-dydx和一般中心化交易所的模式一样，采用订单簿模型。这意味着一个人要在某个价位想做空某个币，那么也必须有个人在该价位去做多该币种，这样才能撮合成功。这也就意味着不需要一个借款方来提供借款服务，因为最终买方和卖方的盈亏会互补。
+dydx和一般中心化交易所的模式一样，采用订单簿模型。这意味着一个人要在某个价位想做空某个币，那么也必须有个人在该价位去做多该币种，这样才能撮合成功。这也就意味着不需要一个借款方来提供借款服务，因为做空者和做多者各持有相同数量的做空头寸和做多头寸。
 
-所有的合约交易者都需要提供保证金，交易者的损失将直接从保证金种扣除用来支付给盈利方，此外保证金还会用来扣除交易手续费和资金费率。最小保证金比例指的是对某个代币进行交易时，保证金
-
-价值和交易代币的实际价值的比。例如如果ETH-USDC的最小保证金比例为110%，那么如果要做空价值100美金的ETH需要抵押110USDC。
+所有的合约交易者都需要提供保证金，交易者的损失将直接从保证金种扣除用来支付给盈利方，此外保证金还会用来扣除交易手续费和资金费率。最小保证金比例指的是对某个代币进行交易时，保证金价值和交易代币的实际价值的比。例如如果ETH-USDC的最小保证金比例为110%，那么如果要做空价值100美金的ETH需要抵押110USDC。
 
 假设交易对为ETH-USDC，一般的做空做多机制如下：
 
 - 如果是做多ETH，则向借款方借入USDC，并将USDC换成ETH，后续结算时再将ETH卖出成USDC，将USDC连本带息还给借款方。此时用户需要USDC作为抵押品。
 - 如果是做空ETH，则向借款方借入ETH，并将ETH换成USDC，后续结算时将USDC买回ETH，将ETH连本带息还给借款方。此时用户需要USDC作为抵押品。
 
-方便理解，提供一个简单的例子如下，假设最小保证金比例为110%(保证金价值/持仓头寸价值)，也就是说如果保证金比例低于110%则用户将被清算：
+方便理解，提供一个简化了的例子如下，假设最小保证金比例为110%(保证金价值/持仓头寸价值)，也就是说如果保证金比例低于110%则用户将被清算：
 
 1. A进行挂单在1000美金以5倍的杠杆做空以太坊，提供保证金为220，则做空的以太坊数量为: 220/110% * 5 / 1000 = 1 ETH。假设当前不存在在1000美金做多以太坊的挂单，所以A此时的订单没有及时成交，故A称为挂单者(maker)。
 2. B在1000美金以10倍做多以太坊，提供保证金为110，则做多的以太坊数量为： 110 / 110% * 10 / 1000 = 1 ETH。由于之前存在了A在1000美金做空的挂单，所以B可以立即成交，此时B成为吃单者(taker)。
-3. 此时A和B撮合成功，A持有1个以太坊多单头寸，B持有1个以太坊空单头寸。由于A的杠杆倍数为5倍，则以太坊价格当上涨1/5 = 20%时A的头寸将被清算。B的杠杆倍数为10倍，则以太坊价格下降1/10 = 10%时B的头寸将被清算。
-4. 当此时ETH价格上涨了2%，即1020美金。此时A将损失2% * 5 = 10% (也就是200 * 10% =  20美金)，B将盈利2 * 10 = 20% (也就是100 * 20 % = 20 美金)。可见两者的盈亏相互抵消了，所以不需要第三方借款方来提供借款。当然为了简化此时我们不考虑手续费和资金费率的问题。
+3. 此时A和B撮合成功，A持有1个以太坊多单头寸，B持有1个以太坊空单头寸，在没有第三方借款方的情况下双方都获得了所需的头寸。当然为了简化此时我们不考虑手续费和资金费率的问题。由于A的杠杆倍数为5倍，则以太坊价格当上涨1/5 = 20%时A的头寸将被清算。B的杠杆倍数为10倍，则以太坊价格下降1/10 = 10%时B的头寸将被清算。
+4. 当此时ETH价格上涨了2%，即1020美金。此时A将损失2% * 5 = 10% (也就是200 * 10% =  20美金)，B将盈利2 * 10 = 20% (也就是100 * 20 % = 20 美金)。
 
 ## 代码架构
 
@@ -737,6 +735,7 @@ function withdrawFinalSettlement()
     }
 ```
 
+
 #### P1Settlement
 包含账户间资金支付结算逻辑的合约。
 
@@ -756,6 +755,137 @@ P1TraderConstants --> P1Liquidation
 P1TraderConstants --> P1Orders
 ```
 
+
+### proxy
+
+#### P1LiquidatorProxy
+合约允许低于最低抵押的帐户被另一个帐户清算。这允许该帐户部分或全部头寸纳入清算人。所有清算利润的一部分直接用于保险基金。
+```
+    function liquidate(
+        address liquidatee,     // 要被清算的账户
+        address liquidator,     // 进行清算的账户
+        bool isBuy,             // 如果是true则说明被清算人持有多头头寸，否则为空头头寸
+        SignedMath.Int calldata maxPosition // 清算人在清算后所持有的最大头寸
+    )
+        external
+        returns (uint256)
+    {
+        I_PerpetualV1 perpetual = I_PerpetualV1(_PERPETUAL_V1_);
+
+        // Verify that this account can liquidate for the liquidator.
+        // 发送交易的账户必须是清算人或者已经被被清算人授权
+        require(
+            liquidator == msg.sender || perpetual.hasAccountPermissions(liquidator, msg.sender),
+            "msg.sender cannot operate the liquidator account"
+        );
+
+        // Settle the liquidator's account and get balances.
+        // 获取清算人的账户余额
+        perpetual.deposit(liquidator, 0);
+        P1Types.Balance memory initialBalance = perpetual.getAccountBalance(liquidator);
+
+        // Get the maximum liquidatable amount.
+        // 获取清算人可以清算的最大的头寸
+        SignedMath.Int memory maxPositionDelta = _getMaxPositionDelta(
+            initialBalance,
+            isBuy,
+            maxPosition
+        );
+
+        // Do the liquidation.
+        _doLiquidation(
+            perpetual,
+            liquidatee,
+            liquidator,
+            maxPositionDelta
+        );
+
+        // Get the balances of the liquidator.
+        // 清算完成后获取当前清算人的最新余额
+        P1Types.Balance memory currentBalance = perpetual.getAccountBalance(liquidator);
+
+        // Get the liquidated amount and fee amount.
+        // 根据清算人的当前头寸余额和清算前的头寸余额获取被清算的数量
+        // 并根据清算人的清算收益获取应收取的清算手续费
+        (uint256 liqAmount, uint256 feeAmount) = _getLiquidatedAndFeeAmount(
+            perpetual,
+            initialBalance,
+            currentBalance
+        );
+
+        // Transfer fee from liquidator to insurance fund.
+        if (feeAmount > 0) {
+            perpetual.withdraw(liquidator, address(this), feeAmount);
+            perpetual.deposit(_INSURANCE_FUND_, feeAmount);
+        }
+
+        // Log the result.
+        emit LogLiquidatorProxyUsed(
+            liquidatee,
+            liquidator,
+            isBuy,
+            liqAmount,
+            feeAmount
+        );
+
+        return liqAmount;
+    }
+```
+其中`_doLiquidation`函数进行具体的清算：
+```
+function _doLiquidation(
+        I_PerpetualV1 perpetual,
+        address liquidatee, 
+        address liquidator,
+        SignedMath.Int memory maxPositionDelta
+    )
+        private
+    {
+        // Create accounts. Base protocol requires accounts to be sorted.
+        // 对账号进行排序
+        // maker被清算者
+        // taker为清算者
+        bool takerFirst = liquidator < liquidatee;
+        address[] memory accounts = new address[](2);
+        uint256 takerIndex = takerFirst ? 0 : 1;
+        uint256 makerIndex = takerFirst ? 1 : 0;
+        accounts[takerIndex] = liquidator;
+        accounts[makerIndex] = liquidatee;
+
+        // Create trade args.
+        I_PerpetualV1.TradeArg[] memory trades = new I_PerpetualV1.TradeArg[](1);
+        trades[0] = I_PerpetualV1.TradeArg({
+            takerIndex: takerIndex,
+            makerIndex: makerIndex,
+            trader: _LIQUIDATION_,
+            data: abi.encode(
+                maxPositionDelta.value,
+                maxPositionDelta.isPositive,
+                false // allOrNothing
+            )
+        });
+
+        // Do the liquidation.
+        // 调用P1Trade.sol合约的trade函数
+        // P1Trade.sol合约的trade函数最后调用traders/P1Liquidation.sol中的trade方法完成清算
+        perpetual.trade(accounts, trades);
+    }
+
+```
+
+#### P1CurrencyConverterProxy
+(todo)
+
+#### P1Proxy
+(todo)
+
+#### P1SoloBridgeProxy
+(todo)
+
+#### P1WethProxy
+(todo)
+
+
 #### P1Orders
 (todo)
 
@@ -769,22 +899,4 @@ P1TraderConstants --> P1Orders
 (todo)
 
 #### P1TraderConstants
-(todo)
-
-
-### proxy
-
-#### P1CurrencyConverterProxy
-(todo)
-
-#### P1LiquidatorProxy
-(todo)
-
-#### P1Proxy
-(todo)
-
-#### P1SoloBridgeProxy
-(todo)
-
-#### P1WethProxy
 (todo)
