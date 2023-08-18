@@ -1,4 +1,28 @@
-# Dydx 合约源码分析
+- [dydx 合约源码分析](#dydx-合约源码分析)
+  - [概述](#概述)
+  - [代码架构](#代码架构)
+    - [impl](#impl)
+      - [P1Margin](#p1margin)
+        - [deposit](#deposit)
+        - [withdraw](#withdraw)
+      - [P1Trade](#p1trade)
+      - [P1FinalSettlement](#p1finalsettlement)
+      - [P1Settlement](#p1settlement)
+      - [P1Getters](#p1getters)
+    - [trader](#trader)
+    - [proxy](#proxy)
+      - [P1LiquidatorProxy](#p1liquidatorproxy)
+      - [P1CurrencyConverterProxy](#p1currencyconverterproxy)
+      - [P1Proxy](#p1proxy)
+      - [P1SoloBridgeProxy](#p1solobridgeproxy)
+      - [P1WethProxy](#p1wethproxy)
+      - [P1Orders](#p1orders)
+      - [P1Deleveraging](#p1deleveraging)
+      - [P1InverseOrders](#p1inverseorders)
+      - [P1Liquidation](#p1liquidation)
+      - [P1TraderConstants](#p1traderconstants)
+
+# dydx 合约源码分析
 
 ## 概述
 dydx和一般中心化交易所的模式一样，采用订单簿模型。这意味着一个人要在某个价位想做空某个币，那么也必须有个人在该价位去做多该币种，这样才能撮合成功。这也就意味着不需要一个借款方来提供借款服务，因为做空者和做多者各持有相同数量的做空头寸和做多头寸。
