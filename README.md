@@ -18,6 +18,8 @@ Smart contract study notes and resource summary 📒 智能合约学习笔记与
 - [smart-contract-best-practices](https://github.com/ConsenSys/smart-contract-best-practices): ConsenSys 关于合约的最佳实践仓库
 - [awesome-ethereum-security](https://github.com/crytic/awesome-ethereum-security): 精彩的以太坊安全参考精选列表
 - [Dapp-Learning](https://github.com/Dapp-Learning-DAO/Dapp-Learning): 适合各个阶段开发者的Dapp学习项目
+- [solidity-expert](https://github.com/dukedaily/solidity-expert): 以太坊开发教程
+- [solidity-security-blog](https://github.com/sigp/solidity-security-blog): Solidity 安全，已知攻击媒介和常见反模式的综合列表
 
 ### 🔧工具
 - [Remix](https://remix.ethereum.org/): Solidity IDE
