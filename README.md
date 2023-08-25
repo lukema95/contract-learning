@@ -34,4 +34,5 @@ Smart contract study notes and resource summary 📒 智能合约学习笔记与
 - [减少智能合约 Gas 消耗的 8 种方法](https://medium.com/coinmonks/8-ways-of-reducing-the-gas-consumption-of-your-smart-contracts-9a506b339c0a)
 - [如何部署和使用可升级的智能合约](https://mp.weixin.qq.com/s/jiA20s8ImXM-H18XCIqzpw)
 - [了解以太坊智能合约存储](https://programtheblockchain.com/posts/2018/03/09/understanding-ethereum-smart-contract-storage/)
+- [Solidity 中编写内联汇编(assembly)的那些事](https://learnblockchain.cn/article/675)
 
