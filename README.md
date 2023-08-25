@@ -24,6 +24,7 @@ Smart contract study notes and resource summary 📒 智能合约学习笔记与
 ### 🔧工具
 - [Remix](https://remix.ethereum.org/): Solidity IDE
 - [Pinata](https://www.pinata.cloud/): IPFS存储，合约图片存储
+- [evm.code](https://www.evm.codes/): 在线以太坊虚拟机操作码文档及交互
 
 ### 📜博客
 - [Solidity 可升级合约](https://mousy-butter-cb8.notion.site/Solidity-66247ec460764824b31a85e16a39aa3a?pvs=4)
