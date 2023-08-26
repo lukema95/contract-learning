@@ -26,6 +26,13 @@ Smart contract study notes and resource summary 📒 智能合约学习笔记与
 - [Pinata](https://www.pinata.cloud/): IPFS存储，合约图片存储
 - [evm.code](https://www.evm.codes/): 在线以太坊虚拟机操作码文档及交互
 
+### 🔌插件
+- [Solidity Debugger Pro](https://marketplace.visualstudio.com/items?itemName=robertaachenw.solidity-debugger-pro): VSCode 插件，Solidity 的独立调试器
+- [Solidity Visual Developer](https://marketplace.visualstudio.com/items?itemName=tintinweb.solidity-visual-auditor): VSCode 插件，提供可视化安全审计、以安全为中心的语法和语义突出显示、详细的类大纲、UML图生成器，以及许多其他特性。
+- [Ethlink](https://github.com/duaraghav8/Ethlint): Solidity 代码风格检查
+- [hardhat-solhint](https://hardhat.org/hardhat-runner/plugins/nomiclabs-hardhat-solhint): Hardhat插件, 代码风格检查
+- [hardhat-gas-reporter](https://www.npmjs.com/package/hardhat-gas-reporter): Hardhat插件, 生成Gas消耗报告
+
 ### 📜博客
 - [Solidity 可升级合约](https://mousy-butter-cb8.notion.site/Solidity-66247ec460764824b31a85e16a39aa3a?pvs=4)
 - [如何使用 Hardhat 在 Etherscan 上验证智能合约](https://blog.chain.link/how-to-verify-smart-contract-on-etherscan-hardhat/)
