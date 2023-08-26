@@ -13,6 +13,7 @@ Smart contract study notes and resource summary 📒 智能合约学习笔记与
 - [Solidity by Example](https://solidity-by-example.org/): Solidity 例子
 - [WTF-Solidity](https://github.com/AmazingAng/WTF-Solidity): Solidity 中文系列课程
 - [gas-puzzles](https://github.com/RareSkills/gas-puzzles): 一系列用于实践 Gas 优化的智能合约。
+- [WTF-gas-optimization](https://github.com/WTFAcademy/WTF-gas-optimization): Gas优化技术，经 Foundry 验证。
 - [learning-solidity](https://github.com/willitscale/learning-solidity): Solidity 文档和 YouTube 教程
 - [awesome-solidity](https://github.com/bkrem/awesome-solidity): 精选的 Solidity 资源、库、工具等列表
 - [smart-contract-best-practices](https://github.com/ConsenSys/smart-contract-best-practices): ConsenSys 关于合约的最佳实践仓库
