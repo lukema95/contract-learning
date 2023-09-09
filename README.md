@@ -22,6 +22,7 @@ Smart contract study notes and resource summary 📒 智能合约学习笔记与
 - [Dapp-Learning](https://github.com/Dapp-Learning-DAO/Dapp-Learning): 适合各个阶段开发者的Dapp学习项目
 - [solidity-expert](https://github.com/dukedaily/solidity-expert): 以太坊开发教程
 - [solidity-security-blog](https://github.com/sigp/solidity-security-blog): Solidity 安全，已知攻击媒介和常见反模式的综合列表
+- [DeFiHackLabs](https://github.com/SunWeb3Sec/DeFiHackLabs): 使用Foundry重现DeFi被黑事件
 
 ### 🔧工具
 - [Remix](https://remix.ethereum.org/): Solidity IDE
