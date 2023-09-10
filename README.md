@@ -55,4 +55,5 @@ Smart contract study notes and resource summary 📒 智能合约学习笔记与
 - [Ethernaut Solutions](https://cmichel.io/ethernaut-solutions/)
 - [Damn Vulnerable DeFi Solutions](https://cmichel.io/damn-vulnerable-de-fi-solutions/)
 - [Paradigm CTF 2021 Solutions](https://cmichel.io/paradigm-ctf-2021-solutions/)
+- [How Diamond Storage Works](https://dev.to/mudgen/how-diamond-storage-works-90e)
 
