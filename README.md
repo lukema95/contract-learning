@@ -23,11 +23,16 @@ Smart contract study notes and resource summary 📒 智能合约学习笔记与
 - [solidity-expert](https://github.com/dukedaily/solidity-expert): 以太坊开发教程
 - [solidity-security-blog](https://github.com/sigp/solidity-security-blog): Solidity 安全，已知攻击媒介和常见反模式的综合列表
 - [DeFiHackLabs](https://github.com/SunWeb3Sec/DeFiHackLabs): 使用Foundry重现DeFi被黑事件
+- [Smart Contract Weakness Classification (SWC) ](https://swcregistry.io/): 智能合约弱点分类
+- [Capture the Ether](https://capturetheether.com/): 以太坊智能合约安全游戏
+- [CryptoZombies](https://cryptozombies.io/): CryptoZombies是一个互动学校，教你所有关于区块链的技术知识。通过制作自己的加密收藏品游戏来学习编写智能合约。
 
 ### 🔧工具
 - [Remix](https://remix.ethereum.org/): Solidity IDE
+- [Hardhat](https://hardhat.org/):以太坊专业开发环境。它由用于编辑、编译、调试和部署智能合约和 dApp 的不同组件组成，所有这些组件共同创建一个完整的开发环境。
 - [Pinata](https://www.pinata.cloud/): IPFS存储，合约图片存储
 - [evm.code](https://www.evm.codes/): 在线以太坊虚拟机操作码文档及交互
+- [mythril](https://github.com/ConsenSys/mythril): EVM字节码的安全分析工具。支持为以太坊、Hedera、Quorum、Vechain、Roostock、Tron 和其他 EVM 兼容区块链构建的智能合约
 
 ### 🔌插件
 - [Solidity Debugger Pro](https://marketplace.visualstudio.com/items?itemName=robertaachenw.solidity-debugger-pro): VSCode 插件，Solidity 的独立调试器
@@ -45,4 +50,9 @@ Smart contract study notes and resource summary 📒 智能合约学习笔记与
 - [如何部署和使用可升级的智能合约](https://mp.weixin.qq.com/s/jiA20s8ImXM-H18XCIqzpw)
 - [了解以太坊智能合约存储](https://programtheblockchain.com/posts/2018/03/09/understanding-ethereum-smart-contract-storage/)
 - [Solidity 中编写内联汇编(assembly)的那些事](https://learnblockchain.cn/article/675)
+- [How to become a smart contract auditor](https://cmichel.io/how-to-become-a-smart-contract-auditor/)
+- [Capture The Ether Solutions](https://cmichel.io/capture-the-ether-solutions/)
+- [Ethernaut Solutions](https://cmichel.io/ethernaut-solutions/)
+- [Damn Vulnerable DeFi Solutions](https://cmichel.io/damn-vulnerable-de-fi-solutions/)
+- [Paradigm CTF 2021 Solutions](https://cmichel.io/paradigm-ctf-2021-solutions/)
 
