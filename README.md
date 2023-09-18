@@ -9,30 +9,37 @@ Smart contract study notes and resource summary 📒 智能合约学习笔记与
 ## 💾学习资料
 ### 🕸️网站
 - [Solidity中文文档](https://solidity-cn.readthedocs.io/)
-- [OpenZeppeline](https://docs.openzeppelin.com/): OpenZeppeline 文档
-- [Solidity by Example](https://solidity-by-example.org/): Solidity 例子
-- [WTF-Solidity](https://github.com/AmazingAng/WTF-Solidity): Solidity 中文系列课程
-- [gas-puzzles](https://github.com/RareSkills/gas-puzzles): 一系列用于实践 Gas 优化的智能合约。
-- [WTF-gas-optimization](https://github.com/WTFAcademy/WTF-gas-optimization): Gas优化技术，经 Foundry 验证。
-- [learning-solidity](https://github.com/willitscale/learning-solidity): Solidity 文档和 YouTube 教程
-- [awesome-solidity](https://github.com/bkrem/awesome-solidity): 精选的 Solidity 资源、库、工具等列表
-- [smart-contract-best-practices](https://github.com/ConsenSys/smart-contract-best-practices): ConsenSys 关于合约的最佳实践仓库
-- [awesome-ethereum-security](https://github.com/crytic/awesome-ethereum-security): 精彩的以太坊安全参考精选列表
-- [WTF-solcurity](https://github.com/WTFAcademy/WTF-solcurity): Solidity 智能合约的公认安全和代码质量标准
-- [Dapp-Learning](https://github.com/Dapp-Learning-DAO/Dapp-Learning): 适合各个阶段开发者的Dapp学习项目
-- [solidity-expert](https://github.com/dukedaily/solidity-expert): 以太坊开发教程
-- [solidity-security-blog](https://github.com/sigp/solidity-security-blog): Solidity 安全，已知攻击媒介和常见反模式的综合列表
-- [DeFiHackLabs](https://github.com/SunWeb3Sec/DeFiHackLabs): 使用Foundry重现DeFi被黑事件
-- [Smart Contract Weakness Classification (SWC) ](https://swcregistry.io/): 智能合约弱点分类
-- [Capture the Ether](https://capturetheether.com/): 以太坊智能合约安全游戏
-- [CryptoZombies](https://cryptozombies.io/): CryptoZombies是一个互动学校，教你所有关于区块链的技术知识。通过制作自己的加密收藏品游戏来学习编写智能合约。
+- [OpenZeppeline](https://docs.openzeppelin.com/) - OpenZeppeline 文档
+- [Solidity by Example](https://solidity-by-example.org/) - Solidity 例子
+- [WTF-Solidity](https://github.com/AmazingAng/WTF-Solidity) - Solidity 中文系列课程
+- [gas-puzzles](https://github.com/RareSkills/gas-puzzles) - 一系列用于实践 Gas 优化的智能合约。
+- [WTF-gas-optimization](https://github.com/WTFAcademy/WTF-gas-optimization) - Gas优化技术，经 Foundry 验证。
+- [learning-solidity](https://github.com/willitscale/learning-solidity) - Solidity 文档和 YouTube 教程
+- [awesome-solidity](https://github.com/bkrem/awesome-solidity) - 精选的 Solidity 资源、库、工具等列表
+- [smart-contract-best-practices](https://github.com/ConsenSys/smart-contract-best-practices) - ConsenSys 关于合约的最佳实践仓库
+- [awesome-ethereum-security](https://github.com/crytic/awesome-ethereum-security) - 精彩的以太坊安全参考精选列表
+- [WTF-solcurity](https://github.com/WTFAcademy/WTF-solcurity) - Solidity 智能合约的公认安全和代码质量标准
+- [Dapp-Learning](https://github.com/Dapp-Learning-DAO/Dapp-Learning) - 适合各个阶段开发者的Dapp学习项目
+- [solidity-expert](https://github.com/dukedaily/solidity-expert) - 以太坊开发教程
+- [solidity-security-blog](https://github.com/sigp/solidity-security-blog) - Solidity 安全，已知攻击媒介和常见反模式的综合列表
+- [DeFiHackLabs](https://github.com/SunWeb3Sec/DeFiHackLabs) - 使用Foundry重现DeFi被黑事件
+- [Smart Contract Weakness Classification (SWC) ](https://swcregistry.io/) - 智能合约弱点分类
+- [Capture the Ether](https://capturetheether.com/) - 以太坊智能合约安全游戏
+- [CryptoZombies](https://cryptozombies.io/) - CryptoZombies是一个互动学校，教你所有关于区块链的技术知识。通过制作自己的加密收藏品游戏来学习编写智能合约。
 
 ### 🔧工具
-- [Remix](https://remix.ethereum.org/): Solidity IDE
-- [Hardhat](https://hardhat.org/):以太坊专业开发环境。它由用于编辑、编译、调试和部署智能合约和 dApp 的不同组件组成，所有这些组件共同创建一个完整的开发环境。
-- [Pinata](https://www.pinata.cloud/): IPFS存储，合约图片存储
-- [evm.code](https://www.evm.codes/): 在线以太坊虚拟机操作码文档及交互
-- [mythril](https://github.com/ConsenSys/mythril): EVM字节码的安全分析工具。支持为以太坊、Hedera、Quorum、Vechain、Roostock、Tron 和其他 EVM 兼容区块链构建的智能合约
+- [Remix](https://remix.ethereum.org/) - Solidity IDE
+- [Hardhat](https://hardhat.org/) - 以太坊专业开发环境。它由用于编辑、编译、调试和部署智能合约和 dApp 的不同组件组成，所有这些组件共同创建一个完整的开发环境。
+- [Foundry](https://github.com/foundry-rs/foundry) - Foundry 是一个使用 Rust 编写的用于以太坊应用程序开发的速度极快、可移植且模块化的工具包。
+- [Pinata](https://www.pinata.cloud/) - IPFS存储，合约图片存储
+- [evm.code](https://www.evm.codes/) - 在线以太坊虚拟机操作码文档及交互
+- [mythril](https://github.com/ConsenSys/mythril) - EVM字节码的安全分析工具。支持为以太坊、Hedera、Quorum、Vechain、Roostock、Tron 和其他 EVM 兼容区块链构建的智能合约
+- [tenderly](https://tenderly.co/) - 使 Web3 开发人员能够构建、测试、监控和操作智能合约，从智能合约的诞生到大规模采用。
+- [Phalcon](https://phalcon.xyz/) - Phalcon 是一款面向加密项目和开发人员的安全开发套件
+- [ABI to interface](https://gnidan.github.io/abi-to-sol/) - 从 ABI JSON 生成 Solidity 接口
+- [ETH Calldata Decode](https://calldata-decoder.apoorv.xyz/) - 解码以太坊 calldata
+- [Get ABI for unverified contracts](https://abi.w1nt3r.xyz/) - 猜测任何以太坊合约的 ABI，即使它没有在 Etherscan 上验证。
+- [Dedaub](https://library.dedaub.com/decompile) - Dedaub 反编译器采用以太坊虚拟机 (EVM) 字节码并生成更具可读性的类似 Solidity 的代码，从而可以更好地理解未经验证的智能合约
 
 ### 🔌插件
 - [Solidity Debugger Pro](https://marketplace.visualstudio.com/items?itemName=robertaachenw.solidity-debugger-pro): VSCode 插件，Solidity 的独立调试器
