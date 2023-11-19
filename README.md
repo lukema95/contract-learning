@@ -27,6 +27,7 @@ Smart contract study notes and resource summary 📒 智能合约学习笔记与
 - [Smart Contract Weakness Classification (SWC) ](https://swcregistry.io/) - 智能合约弱点分类
 - [Capture the Ether](https://capturetheether.com/) - 以太坊智能合约安全游戏
 - [CryptoZombies](https://cryptozombies.io/) - CryptoZombies是一个互动学校，教你所有关于区块链的技术知识。通过制作自己的加密收藏品游戏来学习编写智能合约。
+- [starklings-cairo1](https://github.com/shramee/starklings-cairo1) - An interactive tutorial to get you up and running with Cairo v1 and Starknet
 
 ### 🔧工具
 - [Remix](https://remix.ethereum.org/) - Solidity IDE
