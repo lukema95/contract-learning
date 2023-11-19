@@ -4,7 +4,7 @@ Smart contract study notes and resource summary 📒 智能合约学习笔记与
 # 🧭导航
 ## 📒学习笔记
 ### 🔥DeFi
-- [dydx 源码解读](/DEFI/dydx/README.md)
+- [dydx-v2 合约源码解读](/DEFI/dydx/README.md)
 
 ## 💾学习资料
 ### 🕸️网站
