@@ -24,6 +24,7 @@ Smart contract study notes and resource summary 📒 智能合约学习笔记与
 - [solidity-security-blog](https://github.com/sigp/solidity-security-blog) - Solidity 安全，已知攻击媒介和常见反模式的综合列表
 - [DeFiHackLabs](https://github.com/SunWeb3Sec/DeFiHackLabs) - 使用Foundry重现DeFi被黑事件
 - [DeFiVulnLabs](https://github.com/SunWeb3Sec/DeFiVulnLabs) - 使用 Foundry 了解常见的智能合约漏洞
+- [Blockchain Security Audit List](https://github.com/0xNazgul/Blockchain-Security-Audit-List) - A list of Blockchain Security audit companies, solo auditors and location of public audits
 - [Smart Contract Weakness Classification (SWC) ](https://swcregistry.io/) - 智能合约弱点分类
 - [Capture the Ether](https://capturetheether.com/) - 以太坊智能合约安全游戏
 - [CryptoZombies](https://cryptozombies.io/) - CryptoZombies是一个互动学校，教你所有关于区块链的技术知识。通过制作自己的加密收藏品游戏来学习编写智能合约。
